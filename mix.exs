@@ -22,7 +22,8 @@ defmodule ClusterConsul.MixProject do
 
   defp deps do
     [
-      {:libcluster, "~> 3.2"}
+      {:libcluster, "~> 3.2"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 

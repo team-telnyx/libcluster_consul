@@ -157,7 +157,7 @@ defmodule Cluster.Strategy.Consul do
     %{state | meta: new_nodelist}
   end
 
-  defp get_nodes(%State{config: config} = state) do
+  def get_nodes(%State{config: config} = state) do
     config
     |> Keyword.fetch!(:list_using)
     |> Enum.flat_map(fn

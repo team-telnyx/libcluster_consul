@@ -1,73 +1,152 @@
-defmodule ClusterConsul.Strategy do
-  use Cluster.Strategy
+defmodule Cluster.Strategy.Consul do
+  @moduledoc """
+  This clustering strategy is specific to the Consul service networking
+  solution. It works by querying the platform's metadata API for containers
+  belonging to a given service name and attempts to connect them
+  (see: https://www.consul.io/api/catalog.html).
+
+  There is also the option to require connecting to nodes from different
+  datacenters, or you can stick to a single datacenter.
+
+  It assumes that all nodes share a base name and are using longnames of the
+  form `<basename>@<ip>` where the `<ip>` is unique for each node.
+
+  The Consul service registration isn't part of this module as there are many
+  different ways to accomplish that, so it is assumed you'll do that from
+  another part of your application.
+
+  An example configuration is below:
+      config :libcluster,
+        topologies: [
+          consul_example: [
+            strategy: #{__MODULE__},
+            config: [
+              # The base agent URL.
+              base_url: "http://consul.service.dc1.consul:8500",
+
+              # If authentication is needed, set the access token here.
+              access_token: "036c943f00594d9f97c10dec7e48ff19",
+
+              # Nodes list will be refreshed using Consul on each interval.
+              polling_interval: 10_000,
+
+              # The Consul endpoints used to fetch service nodes.
+              list_using: [
+                # If you want to use the Agent HTTP API as specified in
+                # https://www.consul.io/api/agent.html
+                Cluster.Strategy.Consul.Agent,
+
+                # If you want to use the Health HTTP Endpoint as specified in
+                # https://www.consul.io/api/health.html
+                {Cluster.Strategy.Consul.Health, [passing: true]},
+
+                # If you want to use the Catalog HTTP API as specified in
+                # https://www.consul.io/api/catalog.html
+                Cluster.Strategy.Consul.Catalog,
+
+                # If you want to join nodes from multiple datacenters, do:
+                {Cluster.Strategy.Consul.Multisite, [
+                  datacenters: ["dc1", "dc2", "dc3", ...],
+                  endpoints: [
+                    ... further endpoints ...
+                  ]
+                ]},
+
+                # You can also list all datacenters:
+                {Cluster.Strategy.Consul.Multisite, [
+                  datacenters: :all,
+                  endpoints: [
+                    ... further endpoints ...
+                  ]
+                ]},
+              ]
+
+              # All configurations below are defined as default for all
+              # children endpoints.
+
+              # Datacenter parameter while querying.
+              dc: "dc1",
+
+              # The default service_name for children endpoints specifications.
+              service_name: "my-service",
+
+              # This is the node basename, the Name (first) part of an Erlang
+              # node name (before the @ part. If not specified, it will assume
+              # the same name as the current running node.
+              node_basename: "app_name"
+            ]]]
+  """
+
   use GenServer
+  use Cluster.Strategy
 
   alias Cluster.Strategy.State
-  import Cluster.Logger
+
+  @callback get_nodes(%State{}) :: [atom()]
 
   @default_polling_interval 5_000
+  @default_base_url "http://localhost:8500"
 
-  @impl Cluster.Strategy
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts)
-  end
+  def start_link(args), do: GenServer.start_link(__MODULE__, args)
 
-  @impl GenServer
-  def init(opts) do
-    state = %State{
-      topology: Keyword.fetch!(opts, :topology),
-      connect: Keyword.fetch!(opts, :connect),
-      disconnect: Keyword.fetch!(opts, :disconnect),
-      list_nodes: Keyword.fetch!(opts, :list_nodes),
-      config: Keyword.fetch!(opts, :config),
-      meta: MapSet.new()
-    }
-    name = Keyword.fetch!(state.config, :service_name)
-    port = Keyword.get(state.config, :service_port, 0)
-    _check = Keyword.fetch(state.config, :check)
+  @impl true
+  def init([%State{meta: nil} = state]), do: init([%State{state | :meta => MapSet.new()}])
 
-    info state.topology, "Registering/updating consul service: #{name}"
-    register(name, port)
-    update_check(name, :passing, "Erlang node (#{node()}) is running")
+  def init([%State{config: config} = state]) do
+    state =
+      case Keyword.get(config, :node_basename) do
+        nil ->
+          [node_basename, _] =
+            node()
+            |> to_string()
+            |> String.split("@")
+
+          %{state | config: Keyword.put(config, :node_basename, node_basename)}
+
+        _ ->
+          state
+      end
 
     {:ok, state, 0}
   end
 
-  @impl GenServer
-  def handle_info(:timeout, state) do
-    handle_info(:update_check, state)
-    handle_info(:load, state)
-  end
+  @impl true
+  def handle_info(:timeout, state), do: {:noreply, load(state), polling_interval(state)}
 
-  def handle_info(:load, %State{topology: topology, connect: connect, disconnect: disconnect, list_nodes: list_nodes} = state) do
-    name = Keyword.fetch!(state.config, :service_name)
-    new_nodelist =
-      case get_nodes(name) do
-        {:ok, node_info} ->
-          node_info
-          |> Enum.map(&ip_to_node(&1["Node"]["Address"]))
-          |> MapSet.new()
-        {:error, reason} ->
-          error topology, reason
-      end
-
-    added   = MapSet.difference(new_nodelist, state.meta)
+  defp load(
+         %State{
+           topology: topology,
+           connect: connect,
+           disconnect: disconnect,
+           list_nodes: list_nodes
+         } = state
+       ) do
+    new_nodelist = MapSet.new(get_nodes(state))
+    added = MapSet.difference(new_nodelist, state.meta)
     removed = MapSet.difference(state.meta, new_nodelist)
 
     new_nodelist =
-      case Cluster.Strategy.disconnect_nodes(topology, disconnect, list_nodes, MapSet.to_list(removed)) do
+      case Cluster.Strategy.disconnect_nodes(
+             topology,
+             disconnect,
+             list_nodes,
+             MapSet.to_list(removed)
+           ) do
         :ok ->
           new_nodelist
+
         {:error, bad_nodes} ->
           # Add back the nodes which should have been removed, but which couldn't be for some reason
           Enum.reduce(bad_nodes, new_nodelist, fn {n, _}, acc ->
             MapSet.put(acc, n)
           end)
       end
+
     new_nodelist =
       case Cluster.Strategy.connect_nodes(topology, connect, list_nodes, MapSet.to_list(added)) do
         :ok ->
           new_nodelist
+
         {:error, bad_nodes} ->
           # Remove the nodes which should have been added, but couldn't be for some reason
           Enum.reduce(bad_nodes, new_nodelist, fn {n, _}, acc ->
@@ -75,79 +154,52 @@ defmodule ClusterConsul.Strategy do
           end)
       end
 
-    polling_interval = Keyword.get(state.config, :polling_interval, @default_polling_interval)
-    Process.send_after(self(), :load, polling_interval)
-    {:noreply, %{state | meta: new_nodelist}}
+    %{state | meta: new_nodelist}
   end
 
-  def handle_info(:update_check, state) do
-    name = Keyword.fetch!(state.config, :service_name)
-    update_check(name, :passing, "Erlang node (#{node()}) is running")
-    Process.send_after(self(), :update_check, 5_000)
-    {:noreply, state}
+  defp get_nodes(%State{config: config} = state) do
+    config
+    |> Keyword.fetch!(:list_using)
+    |> Enum.flat_map(fn
+      {endpoint, opts} ->
+        endpoint.get_nodes(%{state | config: Keyword.merge(config, opts)})
+
+      endpoint ->
+        endpoint.get_nodes(state)
+    end)
   end
 
-  def handle_info(_, state) do
-    {:noreply, state}
+  defp polling_interval(config) do
+    Keyword.get(config, :polling_interval, @default_polling_interval)
   end
 
-  @impl GenServer
-  def terminate(reason, state) do
-    name = Keyword.fetch!(state.config, :service_name)
-    output = "Terminated with reason: #{inspect reason}"
-    update_check(name, :critical, output)
-  end
+  def base_url(config) do
+    base_url =
+      config
+      |> Keyword.get(:base_url, @default_base_url)
+      |> URI.parse()
 
-  def register(name, port) do
-    url = agent_url("/agent/service/register")
-    headers = []
-    content_type = ''
-    body = Poison.encode!(register_payload(name, port))
-    request = {to_charlist(url), headers, content_type, body}
-    :httpc.request(:put, request, [], [])
-  end
+    case Keyword.get(config, :dc) do
+      nil ->
+        base_url
 
-  def register_payload(name, port) do
-    check =
-      %{CheckId: "#{name}:erlang-node",
-        Name: "Erlang Node Status",
-        TTL: "10s"}
-    %{name: name, port: port, checks: [check]}
-  end
+      dc ->
+        query =
+          (base_url.query || "")
+          |> URI.decode_query(%{"dc" => dc})
+          |> URI.encode_query()
 
-  @doc """
-  Status values are "passing", "warning", and "critical".
-  """
-  def update_check(service_name, status, output) do
-    check_name = "#{service_name}:erlang-node"
-    url = agent_url("/agent/check/update/#{check_name}")
-    headers = []
-    content_type = ''
-    body = Poison.encode!(%{Status: status, Output: output})
-    request = {to_charlist(url), headers, content_type, body}
-    :httpc.request(:put, request, [], [])
-  end
-
-  def get_nodes(name) do
-    url = agent_url("/health/service/#{name}?passing=true")
-    headers = []
-    response = :httpc.request(:get, {to_charlist(url), headers}, [], [])
-    case response do
-      {:ok, {{_version, 200, _status}, _headers, body}} ->
-        {:ok, Poison.decode!(body)}
-      {:ok, {{_version, code, status}, _headers, body}} ->
-        {:error, "cannot query consul agent (#{code} #{status}): #{inspect body}"}
-      {:error, reason} ->
-        {:error, "request to consul agent failed: #{inspect reason}"}
+        %{base_url | query: query}
     end
   end
 
-  def agent_url(path) do
-    "http://localhost:8500/v1#{path}"
-  end
+  def headers(config) do
+    case Keyword.get(config, :access_token) do
+      nil ->
+        []
 
-  def ip_to_node(ip) do
-    [n, _] = node() |> to_string() |> String.split("@")
-    :"#{n}@#{ip}"
+      access_token ->
+        [{"authorization", "Bearer #{access_token}"}]
+    end
   end
 end

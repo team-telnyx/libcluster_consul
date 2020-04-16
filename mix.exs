@@ -4,24 +4,40 @@ defmodule ClusterConsul.MixProject do
   def project do
     [
       app: :libcluster_consul,
-      version: "0.1.0",
-      elixir: "~> 1.6",
+      version: "1.0.0",
+      elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      package: package(),
+      source_url: "https://github.com/team-telnyx/libcluster_consul",
+      description: description()
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:logger]
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:libcluster, "~> 2.1"}
+      {:libcluster, "~> 3.2"}
+    ]
+  end
+
+  defp description do
+    """
+    Consul strategy for libcluster
+    """
+  end
+
+  defp package do
+    [
+      maintainers: ["Guilherme Balena Versiani <guilherme@telnyx.com>"],
+      licenses: ["Apache 2.0"],
+      links: %{"GitHub" => "https://github.com/team-telnyx/libcluster_consul"},
+      files: ~w"lib mix.exs README.md LICENSE"
     ]
   end
 end

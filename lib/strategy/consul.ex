@@ -169,7 +169,7 @@ defmodule Cluster.Strategy.Consul do
     end)
   end
 
-  defp polling_interval(config) do
+  defp polling_interval(%{config: config}) do
     Keyword.get(config, :polling_interval, @default_polling_interval)
   end
 

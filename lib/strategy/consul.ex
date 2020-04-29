@@ -219,7 +219,7 @@ defmodule Cluster.Strategy.Consul do
 
     opts = [
       ip: ip,
-      dc: Keyword.fetch!(config, :dc),
+      dc: Keyword.get(config, :dc),
       node_basename: Keyword.fetch!(config, :node_basename)
     ]
 

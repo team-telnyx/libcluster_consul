@@ -21,21 +21,6 @@ defmodule Cluster.Strategy.Consul.Endpoint do
   end
 
   def get_nodes(module, %State{topology: topology, config: config}) do
-    case Keyword.fetch!(config, :node_basename) do
-      app_name when is_binary(app_name) and app_name != "" ->
-        get_nodes(module, topology, config, app_name)
-
-      app_name ->
-        warn(
-          topology,
-          "Consul strategy is selected, but :node_basename is invalid, got: #{inspect(app_name)}"
-        )
-
-        []
-    end
-  end
-
-  defp get_nodes(module, topology, config, app_name) do
     url =
       config
       |> Consul.base_url()
@@ -52,7 +37,7 @@ defmodule Cluster.Strategy.Consul.Endpoint do
         body
         |> Jason.decode!()
         |> module.parse_response()
-        |> Enum.map(&:"#{app_name}@#{&1}")
+        |> Enum.map(&Consul.node_name(&1, config))
 
       {:ok, {{_version, code, status}, _headers, body}} ->
         warn(

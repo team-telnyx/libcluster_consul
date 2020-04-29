@@ -73,7 +73,12 @@ defmodule Cluster.Strategy.Consul do
               # This is the node basename, the Name (first) part of an Erlang
               # node name (before the @ part. If not specified, it will assume
               # the same name as the current running node.
-              node_basename: "app_name"
+              node_basename: "app_name",
+
+              # This is the EEx template used to build the node names. The
+              # variables `ip`, `dc` and `node_basename` are available to
+              # compose the node name.
+              node_name_template: "<%= node_basename =>@<%= ip =>"
             ]]]
   """
 
@@ -86,6 +91,7 @@ defmodule Cluster.Strategy.Consul do
 
   @default_polling_interval 5_000
   @default_base_url "http://localhost:8500"
+  @default_node_name_template "<%= node_basename =>@<%= ip =>"
 
   def start_link(args), do: GenServer.start_link(__MODULE__, args)
 
@@ -103,8 +109,13 @@ defmodule Cluster.Strategy.Consul do
 
           %{state | config: Keyword.put(config, :node_basename, node_basename)}
 
-        _ ->
+        app_name when is_binary(app_name) and app_name != "" ->
           state
+
+        app_name ->
+          raise ArgumentError,
+                "Consul strategy is selected, but :node_basename" <>
+                  " is invalid, got: #{inspect(app_name)}"
       end
 
     {:ok, state, 0}
@@ -201,5 +212,17 @@ defmodule Cluster.Strategy.Consul do
       access_token ->
         [{"authorization", "Bearer #{access_token}"}]
     end
+  end
+
+  def node_name(ip, config) do
+    template = Keyword.get(config, :node_name_template, @default_node_name_template)
+
+    opts = [
+      ip: ip,
+      dc: Keyword.fetch!(config, :dc),
+      node_basename: Keyword.fetch!(config, :node_basename)
+    ]
+
+    :"#{EEx.eval_string(template, opts)}"
   end
 end

@@ -91,7 +91,7 @@ defmodule Cluster.Strategy.Consul do
 
   @default_polling_interval 5_000
   @default_base_url "http://localhost:8500"
-  @default_node_name_template "<%= node_basename =>@<%= ip =>"
+  @default_node_name_template "<%= node_basename %>@<%= ip %>"
 
   def start_link(args), do: GenServer.start_link(__MODULE__, args)
 

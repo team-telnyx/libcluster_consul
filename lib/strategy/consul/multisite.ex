@@ -35,7 +35,7 @@ defmodule Cluster.Strategy.Consul.Multisite do
           endpoint.get_nodes(%{state | config: Keyword.merge(config, opts)})
 
         endpoint ->
-          endpoint.get_nodes(state)
+          endpoint.get_nodes(%{state | config: config})
       end)
     end)
   end

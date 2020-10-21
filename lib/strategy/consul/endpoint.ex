@@ -5,7 +5,7 @@ defmodule Cluster.Strategy.Consul.Endpoint do
 
   @type ip :: String.t()
 
-  @callback build_url(URI.t(), Cluster.Strategy.Consul.options()) :: URI.t()
+  @callback build_url(URI.t(), Keyword.t()) :: URI.t()
 
   @callback parse_response([map]) :: [ip]
 

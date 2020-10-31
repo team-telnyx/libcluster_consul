@@ -78,7 +78,11 @@ defmodule Cluster.Strategy.Consul do
               # This is the EEx template used to build the node names. The
               # variables `ip`, `dc` and `node_basename` are available to
               # compose the node name.
-              node_name_template: "<%= node_basename =>@<%= ip =>"
+              node_name_template: "<%= node_basename =>@<%= ip =>",
+
+              # Block when starting the cluster supervisor until after the initial
+              # attempt to join the cluster, or join the cluster asynchronously.
+              async_initial_connection?: true
             ]]]
   """
 
@@ -118,7 +122,10 @@ defmodule Cluster.Strategy.Consul do
                   " is invalid, got: #{inspect(app_name)}"
       end
 
-    {:ok, state, 0}
+    case Keyword.get(config, :async_initial_connection?, true) do
+      true -> {:ok, state, 0}
+      false -> {:ok, load(state), polling_interval(state)}
+    end
   end
 
   @impl true

@@ -70,7 +70,16 @@ config :libcluster,
         # This is the node basename, the Name (first) part of an Erlang
         # node name (before the @ part. If not specified, it will assume
         # the same name as the current running node.
-        node_basename: "app_name"
+        node_basename: "app_name",
+
+        # This is the EEx template used to build the node names. The
+        # variables `ip`, `dc` and `node_basename` are available to
+        # compose the node name.
+        node_name_template: "<%= node_basename =>@<%= ip =>",
+
+        # Block when starting the cluster supervisor until after the initial
+        # attempt to join the cluster, or join the cluster asynchronously.
+        async_initial_connection?: true
       ]]]
 ```
 

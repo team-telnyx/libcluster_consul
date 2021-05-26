@@ -71,6 +71,11 @@ config :libcluster,
         # node name (before the @ part. If not specified, it will assume
         # the same name as the current running node.
         node_basename: "app_name"
+
+        # Which consul response key should be considered as node
+        # hostname (after the @ part). Accepted values: :ip
+        # or :node_name. Default :ip.
+        host_key: :ip
       ]]]
 ```
 

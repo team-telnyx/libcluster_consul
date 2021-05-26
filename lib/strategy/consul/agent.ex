@@ -12,5 +12,5 @@ defmodule Cluster.Strategy.Consul.Agent do
   end
 
   @impl true
-  def parse_response(%{"Address" => ip}), do: [ip]
+  def parse_response(%{"Address" => ip}, _), do: [ip]
 end

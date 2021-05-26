@@ -26,7 +26,14 @@ defmodule Cluster.Strategy.Consul.Health do
   end
 
   @impl true
-  def parse_response(response) when is_list(response) do
+  def parse_response(response, :node_name) when is_list(response) do
+    Enum.map(response, fn
+      %{"Node" => %{"Node" => node}} -> node
+    end)
+  end
+
+  @impl true
+  def parse_response(response, _) when is_list(response) do
     # Fallback to node address when service address is not defined. This mirrors consul's
     # dns behaviour.
     Enum.map(response, fn

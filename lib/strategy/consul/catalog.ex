@@ -12,7 +12,13 @@ defmodule Cluster.Strategy.Consul.Catalog do
   end
 
   @impl true
-  def parse_response(response) when is_list(response) do
+  def parse_response(response, :node_name) when is_list(response) do
+    response
+    |> Enum.map(fn %{"Node" => node} -> node end)
+  end
+
+  @impl true
+  def parse_response(response, _) when is_list(response) do
     response
     |> Enum.map(fn %{"ServiceAddress" => ip} -> ip end)
   end

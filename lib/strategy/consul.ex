@@ -214,7 +214,7 @@ defmodule Cluster.Strategy.Consul do
         []
 
       access_token ->
-        [{"authorization", "Bearer #{access_token}"}]
+        [{to_charlist("authorization"), to_charlist("Bearer #{access_token}")}]
     end
   end
 

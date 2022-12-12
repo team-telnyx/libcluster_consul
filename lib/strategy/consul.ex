@@ -91,7 +91,6 @@ defmodule Cluster.Strategy.Consul do
 
   @default_polling_interval 5_000
   @default_base_url "http://localhost:8500"
-  @default_node_name_template "<%= node_basename %>@<%= ip %>"
 
   def start_link(args), do: GenServer.start_link(__MODULE__, args)
 
@@ -214,19 +213,11 @@ defmodule Cluster.Strategy.Consul do
         []
 
       access_token ->
-        [{"authorization", "Bearer #{access_token}"}]
+        [{to_charlist("X-Consul-Token"), to_charlist("#{access_token}")}]
     end
   end
 
-  def node_name(ip, config) do
-    template = Keyword.get(config, :node_name_template, @default_node_name_template)
-
-    opts = [
-      ip: ip,
-      dc: Keyword.get(config, :dc),
-      node_basename: Keyword.fetch!(config, :node_basename)
-    ]
-
-    :"#{EEx.eval_string(template, opts)}"
+  def node_name(host_or_ip, config) do
+    :"#{Keyword.fetch!(config, :node_basename)}@#{host_or_ip}"
   end
 end

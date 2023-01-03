@@ -7,7 +7,7 @@ defmodule Cluster.Strategy.Consul.Endpoint do
 
   @callback build_url(URI.t(), Keyword.t()) :: URI.t()
 
-  @callback parse_response([map], list()) :: [ip]
+  @callback parse_response([map], Keyword.t()) :: [ip]
 
   defmacro __using__(_opts) do
     quote do

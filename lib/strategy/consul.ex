@@ -34,7 +34,7 @@ defmodule Cluster.Strategy.Consul do
               list_using: [
                 # If you want to use the Agent HTTP API as specified in
                 # https://www.consul.io/api/agent.html
-                Cluster.Strategy.Consul.Agent,
+                Cluster.Strategy.Consul.Agent
 
                 # If you want to use the Health HTTP Endpoint as specified in
                 # https://www.consul.io/api/health.html
@@ -67,19 +67,29 @@ defmodule Cluster.Strategy.Consul do
               # Datacenter parameter while querying.
               dc: "dc1",
 
-              # The default service_name for children endpoints specifications.
-              service_name: "my-service",
+              # The default service for children endpoints specifications.
+              service: [name: "service_name"],
+
+              # NOTE:
+              # Alternatively one could specify id for the service using
+              # service: [id: "service_id"]
+              # The keyword list should contain only one of them, either id or name.
 
               # This is the node basename, the Name (first) part of an Erlang
               # node name (before the @ part. If not specified, it will assume
               # the same name as the current running node.
+              # The final node name will be "node_basename@<host_or_ip>"
               node_basename: "app_name",
-
-              # This is the EEx template used to build the node names. The
-              # variables `ip`, `dc` and `node_basename` are available to
-              # compose the node name.
-              node_name_template: "<%= node_basename =>@<%= ip =>"
             ]]]
+
+
+  The generic response of the Consul endpoints includes respective service's hostname of the node as well as it's IP.
+  It is possible to establish connection using hostname exclusively by using following configuration.
+  To retrieve only passing services `:passing` can be set to true which might be ignored
+  if the API endpoint does not support health status.
+  ```
+  {Cluster.Strategy.Consul.Agent, [expected: :host, passing: true]}
+  ```
   """
 
   use GenServer
@@ -91,7 +101,6 @@ defmodule Cluster.Strategy.Consul do
 
   @default_polling_interval 5_000
   @default_base_url "http://localhost:8500"
-  @default_node_name_template "<%= node_basename %>@<%= ip %>"
 
   def start_link(args), do: GenServer.start_link(__MODULE__, args)
 
@@ -214,19 +223,11 @@ defmodule Cluster.Strategy.Consul do
         []
 
       access_token ->
-        [{"authorization", "Bearer #{access_token}"}]
+        [{to_charlist("X-Consul-Token"), to_charlist("#{access_token}")}]
     end
   end
 
-  def node_name(ip, config) do
-    template = Keyword.get(config, :node_name_template, @default_node_name_template)
-
-    opts = [
-      ip: ip,
-      dc: Keyword.get(config, :dc),
-      node_basename: Keyword.fetch!(config, :node_basename)
-    ]
-
-    :"#{EEx.eval_string(template, opts)}"
+  def node_name(host_or_ip, config) do
+    :"#{Keyword.fetch!(config, :node_basename)}@#{host_or_ip}"
   end
 end

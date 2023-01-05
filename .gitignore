@@ -21,3 +21,6 @@ erl_crash.dump
 
 # Ignore package tarball (built via "mix hex.build").
 libcluster_consul-*.tar
+
+# Ignore .DS_Store for Mac OS
+.DS_Store

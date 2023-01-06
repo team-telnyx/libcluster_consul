@@ -7,7 +7,7 @@ defmodule Cluster.Strategy.Consul.Endpoint do
 
   @callback build_url(URI.t(), Keyword.t()) :: URI.t()
 
-  @callback parse_response([map]) :: [ip]
+  @callback parse_response([map], Keyword.t()) :: [ip]
 
   defmacro __using__(_opts) do
     quote do
@@ -36,7 +36,7 @@ defmodule Cluster.Strategy.Consul.Endpoint do
       {:ok, {{_version, 200, _status}, _headers, body}} ->
         body
         |> Jason.decode!()
-        |> module.parse_response()
+        |> module.parse_response(config)
         |> Enum.map(&Consul.node_name(&1, config))
 
       {:ok, {{_version, code, status}, _headers, body}} ->

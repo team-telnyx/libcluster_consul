@@ -4,7 +4,7 @@ defmodule ClusterConsul.MixProject do
   def project do
     [
       app: :libcluster_consul,
-      version: "1.0.7",
+      version: "1.1.0",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -22,7 +22,7 @@ defmodule ClusterConsul.MixProject do
 
   defp deps do
     [
-      {:libcluster, "~> 3.2"},
+      {:libcluster, "~> 3.3.1"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end

@@ -76,7 +76,11 @@ config :libcluster,
         # node name (before the @ part. If not specified, it will assume
         # the same name as the current running node.
         # The final node name will be "node_basename@<host_or_ip>"
-        node_basename: "app_name"
+        node_basename: "app_name",
+
+        # Block when starting the cluster supervisor until after the initial
+        # attempt to join the cluster, or join the cluster asynchronously.
+        async_initial_connection?: true
       ]]]
 ```
 

@@ -110,7 +110,7 @@ The Health API Endpoint strictly requires the `:name` option to be specified wit
 ```elixir
 def deps do
   [
-    {:libcluster_consul, "~> 1.0.0"}
+    {:libcluster_consul, "~> 1.1.0"}
   ]
 end
 ```

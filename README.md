@@ -68,7 +68,7 @@ config :libcluster,
         service: [name: "service_name"],
 
         # Apply filtering
-        filter: ~s("canary" version in Service.Tags),
+        filter: ~s("canary" in Service.Tags),
 
         # NOTE:
         # Alternatively one could specify id for the service using

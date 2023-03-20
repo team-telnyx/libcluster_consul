@@ -67,6 +67,9 @@ config :libcluster,
         # The default service for children endpoints specifications.
         service: [name: "service_name"],
 
+        # Apply filtering
+        filter: ~s("canary" version in Service.Tags),
+
         # NOTE:
         # Alternatively one could specify id for the service using
         # service: [id: "service_id"]

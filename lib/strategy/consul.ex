@@ -210,18 +210,11 @@ defmodule Cluster.Strategy.Consul do
       |> Keyword.get(:base_url, @default_base_url)
       |> URI.parse()
 
-    case Keyword.get(config, :dc) do
-      nil ->
-        base_url
-
-      dc ->
-        query =
-          (base_url.query || "")
-          |> URI.decode_query(%{"dc" => dc})
-          |> URI.encode_query()
-
-        %{base_url | query: query}
-    end
+    base_url
+    |> decode_query()
+    |> maybe_add_query(:dc, config)
+    |> maybe_add_query(:filter, config)
+    |> encode_query()
   end
 
   def headers(config) do
@@ -236,5 +229,20 @@ defmodule Cluster.Strategy.Consul do
 
   def node_name(host_or_ip, config) do
     :"#{Keyword.fetch!(config, :node_basename)}@#{host_or_ip}"
+  end
+
+  defp decode_query(base_url) do
+    %{base_url | query: URI.decode_query(base_url.query || "")}
+  end
+
+  defp maybe_add_query(base_url, key, config) do
+    case Keyword.get(config, key) do
+      nil -> base_url
+      value -> %{base_url | query: Map.put(base_url.query, key, value)}
+    end
+  end
+
+  defp encode_query(base_url) do
+    %{base_url | query: URI.encode_query(base_url.query)}
   end
 end

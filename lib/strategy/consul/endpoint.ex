@@ -32,7 +32,21 @@ defmodule Cluster.Strategy.Consul.Endpoint do
       config
       |> Consul.headers()
 
-    case :httpc.request(:get, {to_charlist(url), headers}, [], []) do
+    disable_verify_ssl? = Keyword.get(config, :disable_verify_ssl?, false)
+
+    opts =
+      if disable_verify_ssl? do
+        [{:ssl, [{:verify, :verify_none}]}]
+      else
+        []
+      end
+
+    case :httpc.request(
+           :get,
+           {to_charlist(url), headers},
+           opts,
+           []
+         ) do
       {:ok, {{_version, 200, _status}, _headers, body}} ->
         body
         |> Jason.decode!()

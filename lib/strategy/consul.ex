@@ -83,7 +83,11 @@ defmodule Cluster.Strategy.Consul do
 
               # Block when starting the cluster supervisor until after the initial
               # attempt to join the cluster, or join the cluster asynchronously.
-              async_initial_connection?: true
+              async_initial_connection?: true,
+
+              # Disable ssl verification if set to true when making the
+              # http request to consul, defaults to false.
+              disable_verify_ssl?: false
             ]]]
 
 
